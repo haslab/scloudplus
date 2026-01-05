@@ -402,7 +402,7 @@ void readu8tom(uint8_t *in, int n, uint16_t *out, int *outlen)
 		tmp[7] = (*(uint16_t *)(ptrin + 9) >> 5) & 0x7FF;
 		for (int j = 0; j < 8; j++)
 		{
-			if (tmp[j] < scloudplus_n)
+			if (tmp[j] < scloudplus_m)
 			{
 				*ptrout = tmp[j];
 				ptrout = ptrout + 1;
