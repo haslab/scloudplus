@@ -54,7 +54,7 @@ double my_round(double x) {
  < n/2
  */
 
-static inline void compute_v(const uint8_t* m, Complex v[16])
+void compute_v(const uint8_t* m, Complex v[16])
 {
     uint8_t A[6] = {0};
     uint8_t B[20] = {0};
@@ -149,7 +149,7 @@ static inline void compute_v(const uint8_t* m, Complex v[16])
  *     Update v ← (w1 , w1 + ϕw2 , w3 , w3 + ϕw4 , . . . , w_n/2^l −1 , w_n/2^l
  * −1 + ϕw_n/2^l ) end for Compute w = [v]_2^τ return w
  */
-static inline void compute_w(const Complex v[16], uint16_t w[32])
+void compute_w(const Complex v[16], uint16_t w[32])
 {
     Complex tmp[16];
     Complex base;
@@ -205,7 +205,7 @@ static inline void compute_w(const Complex v[16], uint16_t w[32])
  * This function reduces the lattice vector w to the complex vector v by
  * applying the modulus operation based on the value of scloudplus_tau.
  */
-static inline void reduce_w(Complex inout[16])
+void reduce_w(Complex inout[16])
 {
     double mod, sub, real, imag;
 #if (scloudplus_tau == 3)
@@ -305,7 +305,7 @@ static inline void reduce_w(Complex inout[16])
  * by extracting the real and imaginary parts of v and combining them
  * based on the value of scloudplus_tau.
  */
-static inline void recover_m(const Complex v[16], uint8_t* m)
+void recover_m(const Complex v[16], uint8_t* m)
 {
     int A[6] = {0, 1, 2, 4, 8, 16};
     int B[20] = {
@@ -382,7 +382,7 @@ static inline void recover_m(const Complex v[16], uint8_t* m)
  * This function recovers the complex vector v from the lattice vector w
  * by applying the inverse operations of the labeling method.
  */
-static inline void recover_v(const Complex w[16], Complex v[16])
+void recover_v(const Complex w[16], Complex v[16])
 {
     Complex tmp[16] = {0, 0};
     Complex base = {0.5, -0.5};
