@@ -262,61 +262,112 @@ void scloudplus_sampleeta2(uint8_t *seed, uint16_t *matrixe1,
 	free(tmp);
 }
 
+
+static inline uint32_t div600_u32(uint32_t x) {
+  return (uint64_t)x * 0x1b4e81b5 >> 38;
+}
+
+static inline uint64_t div1120_u64(uint64_t x)
+{
+  uint64_t q =
+    ( (__uint128_t)x * 0xea0ea0ea0ea0ea0full ) >> 74;
+  return q;
+}
+
+static inline uint64_t div1136_u64(uint64_t x)
+{
+  uint64_t q = ( (__uint128_t)(x>>4) * 0xe6c2b4481cd8569ull ) >> 66;
+  return q;
+}
+
 void readu8ton(uint8_t *in, int n, uint16_t *out, int *outlen)
 {
 	uint8_t *ptrin = in;
 	uint16_t *ptrout = out;
 	*outlen = 0;
 #if (scloudplus_l == 128)
-	uint32_t tmp;
+	uint32_t tmp, q, r;
 	for (int i = 0; i < n; i = i + 7)
 	{
 		tmp = read4bytestou32(ptrin) & 0xFFFFFFF;
 		if (tmp < scloudplus_n3)
 		{
-			*ptrout = tmp % scloudplus_n;
-			*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
-			*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			// scloudplus_n==600
+			//*ptrout = tmp % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*ptrout = r;
+			tmp = q;
+			//*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*(ptrout + 1) = r;
+			//*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			*(ptrout + 2) = q;
 			ptrout = ptrout + 3;
 			*outlen += 3;
 		}
 		tmp = (read4bytestou32(ptrin + 3) >> 4) & 0xFFFFFFF;
 		if (tmp < scloudplus_n3)
 		{
-			*ptrout = tmp % scloudplus_n;
-			*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
-			*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			// scloudplus_n==600
+			//*ptrout = tmp % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*ptrout = r;
+			tmp = q;
+			//*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*(ptrout + 1) = r;
+			//*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			*(ptrout + 2) = q;
 			ptrout = ptrout + 3;
 			*outlen += 3;
 		}
 		ptrin = ptrin + 7;
 	}
 #elif (scloudplus_l == 192)
-	uint16_t tmp[8] = {0};
-	for (int i = 0; i < n; i = i + 11)
+	uint64_t t64, x;
+	for (int i = 0; i < n/15; i++)
 	{
-		tmp[0] = *(uint16_t *)ptrin & 0x7FF;
-		tmp[1] = (*(uint16_t *)(ptrin + 1) >> 3) & 0x7FF;
-		tmp[2] = (*(uint32_t *)(ptrin + 2) >> 6) & 0x7FF;
-		tmp[3] = (*(uint16_t *)(ptrin + 4) >> 1) & 0x7FF;
-		tmp[4] = (*(uint16_t *)(ptrin + 5) >> 4) & 0x7FF;
-		tmp[5] = (*(uint32_t *)(ptrin + 6) >> 7) & 0x7FF;
-		tmp[6] = (*(uint16_t *)(ptrin + 8) >> 2) & 0x7FF;
-		tmp[7] = (*(uint16_t *)(ptrin + 9) >> 5) & 0x7FF;
-		for (int j = 0; j < 8; j++)
-		{
-			if (tmp[j] < scloudplus_n)
-			{
-				*ptrout = tmp[j];
-				ptrout = ptrout + 1;
+		t64 = *(uint64_t *)ptrin & 0x0FFFFFFFFFFFFFFFull;
+		for (int j = 0; j < 6; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_n) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
 				*outlen += 1;
 			}
 		}
-		ptrin = ptrin + 11;
+		t64 = *(uint64_t *)(ptrin + 7) >> 4;
+		for (int j = 0; j < 6; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_n) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
+				*outlen += 1;
+			}
+		}
+		ptrin += 15;
+	}
+	if (n%15 != 0) {
+		t64 = *(uint64_t *)(ptrin - (8-n%15)) >> 8*(8-n%15);
+		for (int j = 0; j < 4; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_n) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
+				*outlen += 1;
+			}
+		}
 	}
 #elif (scloudplus_l == 256)
-	uint64_t A[8] = {0};
-	for (int i = 0; i < 13; i++)
+	uint64_t A[8], q, r;
+	for (int i = 0; i < scloudplus_rejblocks*136/51; i++)
 	{
 		A[0] = *(uint64_t *)ptrin & 0x7FFFFFFFFFFFF;
 		A[1] = (*(uint64_t *)(ptrin + 6) >> 3) & 0x7FFFFFFFFFFFF;
@@ -330,31 +381,33 @@ void readu8ton(uint8_t *in, int n, uint16_t *out, int *outlen)
 		{
 			if (A[j] < scloudplus_n5)
 			{
-				*ptrout = A[j] % scloudplus_n;
-				*(ptrout + 1) = A[j] / scloudplus_n % scloudplus_n;
-				*(ptrout + 2) = A[j] / scloudplus_n2 % scloudplus_n;
-				*(ptrout + 3) = A[j] / scloudplus_n3 % scloudplus_n;
-				*(ptrout + 4) = A[j] / scloudplus_n4 % scloudplus_n;
+				// scloudplus_n==1120
+				//*ptrout = A[j] % scloudplus_n;
+				q = div1120_u64(A[j]);
+				r = A[j] - q*1120;
+				*ptrout = r;
+				A[j] = q;
+				//*(ptrout + 1) = A[j] / scloudplus_n % scloudplus_n;
+				q = div1120_u64(A[j]);
+				r = A[j] - q*1120;
+				*(ptrout + 1) = r;
+				A[j] = q;
+				//*(ptrout + 2) = A[j] / scloudplus_n2 % scloudplus_n;
+				q = div1120_u64(A[j]);
+				r = A[j] - q*1120;
+				*(ptrout + 2) = r;
+				A[j] = q;
+				//*(ptrout + 3) = A[j] / scloudplus_n3 % scloudplus_n;
+				q = div1120_u64(A[j]);
+				r = A[j] - q*1120;
+				*(ptrout + 3) = r;
+				//*(ptrout + 4) = A[j] / scloudplus_n4 % scloudplus_n;
+				*(ptrout + 4) = q;
 				ptrout = ptrout + 5;
 				*outlen += 5;
 			}
 		}
 		ptrin = ptrin + 51;
-	}
-	A[0] = *(uint64_t *)ptrin & 0x7FFFFFFFFFFFF;
-	A[1] = (*(uint64_t *)(ptrin + 6) >> 3) & 0x7FFFFFFFFFFFF;
-	for (int j = 0; j < 2; j++)
-	{
-		if (A[j] < scloudplus_n5)
-		{
-			*ptrout = A[j] % scloudplus_n;
-			*(ptrout + 1) = A[j] / scloudplus_n % scloudplus_n;
-			*(ptrout + 2) = A[j] / scloudplus_n2 % scloudplus_n;
-			*(ptrout + 3) = A[j] / scloudplus_n3 % scloudplus_n;
-			*(ptrout + 4) = A[j] / scloudplus_n4 % scloudplus_n;
-			ptrout = ptrout + 5;
-			*outlen += 5;
-		}
 	}
 #endif
 }
@@ -365,55 +418,88 @@ void readu8tom(uint8_t *in, int n, uint16_t *out, int *outlen)
 	uint16_t *ptrout = out;
 	*outlen = 0;
 #if (scloudplus_l == 128)
-	uint32_t tmp;
+	uint32_t tmp, q, r;
 	for (int i = 0; i < n; i = i + 7)
 	{
 		tmp = read4bytestou32(ptrin) & 0xFFFFFFF;
 		if (tmp < scloudplus_m3)
 		{
-			*ptrout = tmp % scloudplus_m;
-			*(ptrout + 1) = tmp / scloudplus_m % scloudplus_m;
-			*(ptrout + 2) = tmp / scloudplus_m2 % scloudplus_m;
+			// scloudplus_m==600
+			//*ptrout = tmp % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*ptrout = r;
+			tmp = q;
+			//*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*(ptrout + 1) = r;
+			//*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			*(ptrout + 2) = q;
 			ptrout = ptrout + 3;
 			*outlen += 3;
 		}
 		tmp = (read4bytestou32(ptrin + 3) >> 4) & 0xFFFFFFF;
 		if (tmp < scloudplus_m3)
 		{
-			*ptrout = tmp % scloudplus_m;
-			*(ptrout + 1) = tmp / scloudplus_m % scloudplus_m;
-			*(ptrout + 2) = tmp / scloudplus_m2 % scloudplus_m;
+			// scloudplus_m==600
+			//*ptrout = tmp % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*ptrout = r;
+			tmp = q;
+			//*(ptrout + 1) = tmp / scloudplus_n % scloudplus_n;
+			q = div600_u32(tmp);
+			r = tmp - q * 600;
+			*(ptrout + 1) = r;
+			//*(ptrout + 2) = tmp / scloudplus_n2 % scloudplus_n;
+			*(ptrout + 2) = q;
 			ptrout = ptrout + 3;
 			*outlen += 3;
 		}
 		ptrin = ptrin + 7;
 	}
 #elif (scloudplus_l == 192)
-	uint16_t tmp[8] = {0};
-	for (int i = 0; i < n; i = i + 11)
+	uint64_t t64, x;
+	for (int i = 0; i < n/15; i++)
 	{
-		tmp[0] = *(uint16_t *)ptrin & 0x7FF;
-		tmp[1] = (*(uint16_t *)(ptrin + 1) >> 3) & 0x7FF;
-		tmp[2] = (*(uint32_t *)(ptrin + 2) >> 6) & 0x7FF;
-		tmp[3] = (*(uint16_t *)(ptrin + 4) >> 1) & 0x7FF;
-		tmp[4] = (*(uint16_t *)(ptrin + 5) >> 4) & 0x7FF;
-		tmp[5] = (*(uint32_t *)(ptrin + 6) >> 7) & 0x7FF;
-		tmp[6] = (*(uint16_t *)(ptrin + 8) >> 2) & 0x7FF;
-		tmp[7] = (*(uint16_t *)(ptrin + 9) >> 5) & 0x7FF;
-		for (int j = 0; j < 8; j++)
-		{
-			if (tmp[j] < scloudplus_m)
-			{
-				*ptrout = tmp[j];
-				ptrout = ptrout + 1;
+		t64 = *(uint64_t *)ptrin & 0x0FFFFFFFFFFFFFFF;
+		for (int j = 0; j < 6; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_m) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
 				*outlen += 1;
 			}
 		}
-		ptrin = ptrin + 11;
+		t64 = *(uint64_t *)(ptrin + 7) >> 4;
+		for (int j = 0; j < 6; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_m) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
+				*outlen += 1;
+			}
+		}
+		ptrin += 15;
+	}
+	if (n%15 != 0) {
+		t64 = *(uint64_t *)(ptrin - (8-n%15)) >> 8*(8-n%15);
+		for (int j = 0; j < 4; j++) {
+			x = t64 & 0x3FF;
+			t64 >>= 10;
+			if (x < scloudplus_m) {
+				*ptrout = (uint16_t) x;
+				ptrout += 1;
+				*outlen += 1;
+			}
+		}
 	}
 #elif (scloudplus_l == 256)
-	uint64_t A[8] = {0};
-	for (int i = 0; i < 13; i++)
+	uint64_t A[8], q, r;
+	for (int i = 0; i < scloudplus_rejblocks*136/51; i++)
 	{
 		A[0] = *(uint64_t *)ptrin & 0x7FFFFFFFFFFFF;
 		A[1] = (*(uint64_t *)(ptrin + 6) >> 3) & 0x7FFFFFFFFFFFF;
@@ -427,31 +513,33 @@ void readu8tom(uint8_t *in, int n, uint16_t *out, int *outlen)
 		{
 			if (A[j] < scloudplus_m5)
 			{
-				*ptrout = A[j] % scloudplus_m;
-				*(ptrout + 1) = A[j] / scloudplus_m % scloudplus_m;
-				*(ptrout + 2) = A[j] / scloudplus_m2 % scloudplus_m;
-				*(ptrout + 3) = A[j] / scloudplus_m3 % scloudplus_m;
-				*(ptrout + 4) = A[j] / scloudplus_m4 % scloudplus_m;
+				// scloudplus_m==1136
+				//*ptrout = A[j] % scloudplus_m;
+				q = div1136_u64(A[j]);
+				r = A[j] - q*1136;
+				*ptrout = r;
+				A[j] = q;
+				//*(ptrout + 1) = A[j] / scloudplus_n % scloudplus_m;
+				q = div1136_u64(A[j]);
+				r = A[j] - q*1136;
+				*(ptrout + 1) = r;
+				A[j] = q;
+				//*(ptrout + 2) = A[j] / scloudplus_n2 % scloudplus_m;
+				q = div1136_u64(A[j]);
+				r = A[j] - q*1136;
+				*(ptrout + 2) = r;
+				A[j] = q;
+				//*(ptrout + 3) = A[j] / scloudplus_n3 % scloudplus_m;
+				q = div1136_u64(A[j]);
+				r = A[j] - q*1136;
+				*(ptrout + 3) = r;
+				//*(ptrout + 4) = A[j] / scloudplus_n4 % scloudplus_m;
+				*(ptrout + 4) = q;
 				ptrout = ptrout + 5;
 				*outlen += 5;
 			}
 		}
 		ptrin = ptrin + 51;
-	}
-	A[0] = *(uint64_t *)ptrin & 0x7FFFFFFFFFFFF;
-	A[1] = (*(uint64_t *)(ptrin + 6) >> 3) & 0x7FFFFFFFFFFFF;
-	for (int j = 0; j < 2; j++)
-	{
-		if (A[j] < scloudplus_m5)
-		{
-			*ptrout = A[j] % scloudplus_m;
-			*(ptrout + 1) = A[j] / scloudplus_m % scloudplus_m;
-			*(ptrout + 2) = A[j] / scloudplus_m2 % scloudplus_m;
-			*(ptrout + 3) = A[j] / scloudplus_m3 % scloudplus_m;
-			*(ptrout + 4) = A[j] / scloudplus_m4 % scloudplus_m;
-			ptrout = ptrout + 5;
-			*outlen += 5;
-		}
 	}
 #endif
 }
@@ -459,14 +547,14 @@ void readu8tom(uint8_t *in, int n, uint16_t *out, int *outlen)
 void scloudplus_samplepsi(uint8_t *seed, uint16_t *matrixs)
 {
 	memset(matrixs, 0, scloudplus_n * scloudplus_nbar * 2);
-	uint8_t hash[680] = {0};
-	uint16_t tmp[scloudplus_mnout] = {0};
+	uint8_t hash[scloudplus_rejblocks*136];
+	uint16_t tmp[scloudplus_mnout];
 	keccak_state state;
 	int outlen, condition, k = 0;
 	uint16_t location, mask;
 	shake256_absorb_once(&state, seed, 32);
-	shake256_squeezeblocks(hash, 5, &state);
-	readu8ton(hash, scloudplus_mnin, tmp, &outlen);
+	shake256_squeezeblocks(hash, scloudplus_rejblocks, &state);
+	readu8ton(hash, 136*scloudplus_rejblocks, tmp, &outlen);
 	for (int i = 0; i < scloudplus_nbar; i++)
 	{
 		int j = 0;
@@ -474,8 +562,8 @@ void scloudplus_samplepsi(uint8_t *seed, uint16_t *matrixs)
 		{
 			if (k == outlen)
 			{
-				shake256_squeezeblocks(hash, 5, &state);
-				readu8ton(hash, scloudplus_mnin, tmp, &outlen);
+				shake256_squeezeblocks(hash, scloudplus_rejblocks, &state);
+				readu8ton(hash, 136*scloudplus_rejblocks, tmp, &outlen);
 				k = 0;
 			}
 			location = tmp[k];
@@ -493,14 +581,14 @@ void scloudplus_samplepsi(uint8_t *seed, uint16_t *matrixs)
 void scloudplus_samplephi(uint8_t *seed, uint16_t *matrixs)
 {
 	memset(matrixs, 0, scloudplus_mbar * scloudplus_m * 2);
-	uint8_t hash[680] = {0};
-	uint16_t tmp[scloudplus_mnout] = {0}; //((680-680%7)/7)*6
+	uint8_t hash[scloudplus_rejblocks*136];
+	uint16_t tmp[scloudplus_mnout];
 	keccak_state state;
 	int outlen, condition, k = 0;
 	uint16_t location, mask;
 	shake256_absorb_once(&state, seed, 32);
-	shake256_squeezeblocks(hash, 5, &state);
-	readu8tom(hash, scloudplus_mnin, tmp, &outlen);
+	shake256_squeezeblocks(hash, scloudplus_rejblocks, &state);
+	readu8tom(hash, 136*scloudplus_rejblocks, tmp, &outlen);
 	for (int i = 0; i < scloudplus_mbar; i++)
 	{
 		int j = 0;
@@ -508,8 +596,8 @@ void scloudplus_samplephi(uint8_t *seed, uint16_t *matrixs)
 		{
 			if (k == outlen)
 			{
-				shake256_squeezeblocks(hash, 5, &state);
-				readu8tom(hash, scloudplus_mnin, tmp, &outlen);
+				shake256_squeezeblocks(hash, scloudplus_rejblocks, &state);
+				readu8tom(hash, 136*scloudplus_rejblocks, tmp, &outlen);
 				k = 0;
 			}
 			location = tmp[k];

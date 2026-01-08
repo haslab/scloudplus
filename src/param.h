@@ -34,7 +34,8 @@
 #define scloudplus_n2 360000
 #define scloudplus_n3 216000000
 #define scloudplus_mnin 679
-#define scloudplus_mnout 582
+#define scloudplus_mnout 816 /* 582 */
+#define scloudplus_rejblocks 7
 #elif (scloudplus_l == 192)
 #define scloudplus_ss 24
 #define scloudplus_m 928
@@ -61,7 +62,8 @@
 #define scloudplus_pke_sk 1792
 #define scloudplus_kem_sk 13008
 #define scloudplus_mnin 671
-#define scloudplus_mnout 488
+#define scloudplus_mnout 544 /* 488 */
+#define scloudplus_rejblocks 5
 #elif (scloudplus_l == 256)
 #define scloudplus_ss 32
 #define scloudplus_m 1136
@@ -96,7 +98,8 @@
 #define scloudplus_m4 1665379926016
 #define scloudplus_m5 1891871595954176
 #define scloudplus_mnin 680
-#define scloudplus_mnout 530
+#define scloudplus_mnout 320 //* 530 */
+#define scloudplus_rejblocks 3
 #else
 #error \
 	"Please define one of scloudplus_l_128, scloudplus_l_192, or scloudplus_l_256"
